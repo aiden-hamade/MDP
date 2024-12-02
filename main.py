@@ -177,6 +177,72 @@ class World():
             if policy_stable:
                 break
         return V, policy
+    
+    def epsilon_greedy_q_learning(self, alpha=0.5, epsilon=0.5, gamma=0.98, episodes=500):
+        """
+        Runs epsilon-greedy Q-learning on the Wumpus World.
+        """
+        # Initialize Q-table
+        Q = {
+            (i, j): {action: 0.0 for action in self.valid_moves((i, j))}
+            for i in range(self.rows) for j in range(self.cols)
+        }
+        
+        # Initialize rewards
+        rewards = self.get_rewards()
+
+        # List to collect cumulative rewards for each run
+        cumulative_rewards = []
+
+        # Run the episodes
+        for episode in range(episodes):
+            # Reset agent to the starting position
+            state = self.location
+            episode_reward = 0
+
+            while True:
+                # Choose action: epsilon-greedy strategy
+                if random.random() < epsilon:
+                    action = random.choice(list(Q[state].keys()))  # Explore
+                else:
+                    action = max(Q[state], key=Q[state].get)  # Exploit
+                
+                # Determine next state and reward
+                next_state = self.get_next_state(state, action)
+                reward = rewards[next_state]
+                episode_reward += reward
+
+                # Determine actual action outcome based on transition probabilities
+                prob = random.random()
+                if prob < 0.15:  # Reverse
+                    action = {'^': 'v', 'v': '^', '<': '>', '>': '<'}[action]
+                    next_state = self.get_next_state(state, action)
+                elif prob < 0.30:  # Stall
+                    next_state = state
+                
+                # Update Q-value
+                best_next_q = max(Q[next_state].values()) if Q[next_state] else 0
+                Q[state][action] = Q[state][action] + alpha * (
+                    reward + gamma * best_next_q - Q[state][action]
+                )
+                
+                # Transition to the next state
+                state = next_state
+                
+                # Terminate if we reach a terminal state (goal or pit)
+                if self.map[state[0]][state[1]] in {'G', 'P', 'W'}:
+                    break
+            
+            # Store cumulative reward for the episode
+            cumulative_rewards.append(episode_reward)
+        
+        # Derive the policy from the Q-table
+        policy = {
+            state: max(Q[state], key=Q[state].get) if Q[state] else None
+            for state in Q
+        }
+        
+        return Q, policy, cumulative_rewards
      
 
 def main():
@@ -196,6 +262,28 @@ def main():
         
     for i in range(world.rows):
         print(' '.join(policy[(i, j)] if policy[(i, j)] else '.' for j in range(world.cols)))
+        
+    results = []
+    for run in range(5):
+        print(f"Run {run + 1}:")
+        Q, policy, rewards = world.epsilon_greedy_q_learning(alpha=0.5, epsilon=0.5, gamma=0.98, episodes=500)
+
+        # Collect results
+        results.append({
+            'Q': Q,
+            'policy': policy,
+            'rewards': rewards
+        })
+
+        # Output cumulative rewards and policy for the run
+        print("Cumulative Rewards:")
+        print(rewards[-10:])  # Last 10 rewards as a sample
+
+        print("\nPolicy Grid:")
+        for i in range(world.rows):
+            print(' '.join(policy[(i, j)] if policy[(i, j)] else '.' for j in range(world.cols)))
+        print("\n")
+
 
 
 if __name__ == '__main__':
