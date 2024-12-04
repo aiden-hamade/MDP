@@ -1,5 +1,6 @@
 import numpy as np
 import json
+import random
 
 class World():
     def __init__(self):
@@ -184,7 +185,7 @@ class World():
         """
         # Initialize Q-table
         Q = {
-            (i, j): {action: 0.0 for action in self.valid_moves((i, j))}
+            (i, j): {action: 0.0 for action in ['^', 'v', '<', '>']}
             for i in range(self.rows) for j in range(self.cols)
         }
         
@@ -215,8 +216,10 @@ class World():
                 # Determine actual action outcome based on transition probabilities
                 prob = random.random()
                 if prob < 0.15:  # Reverse
-                    action = {'^': 'v', 'v': '^', '<': '>', '>': '<'}[action]
-                    next_state = self.get_next_state(state, action)
+                    reverse_action = {'^': 'v', 'v': '^', '<': '>', '>': '<'}.get(action, action)
+                    if reverse_action not in Q[state]:
+                        reverse_action = action
+                    next_state = self.get_next_state(state, reverse_action)
                 elif prob < 0.30:  # Stall
                     next_state = state
                 
