@@ -83,11 +83,11 @@ class World():
             return x, min(self.cols - 1, y + 1)
         return state
 
-    def value_iteration(self, gamma=0.95, time_horizon=50):
+    def value_iteration(self, gamma=0.95, time_horizon=100):
         rewards = self.get_rewards()
         V = np.zeros((self.rows, self.cols))  # Initialize values to 0
         for t in range(time_horizon):
-            new_V = np.copy(V)
+            new_V = deepcopy(V)
             for i in range(self.rows):
                 for j in range(self.cols):
                     state = (i, j)
@@ -116,7 +116,7 @@ class World():
         rewards = self.get_rewards()
         V = np.zeros((self.rows, self.cols))  # Initialize value function to zero
         for _ in range(time_horizon):  # Run for a fixed number of iterations
-            new_V = np.copy(V)
+            new_V = deepcopy(V)
             for i in range(self.rows):
                 for j in range(self.cols):
                     state = (i, j)
@@ -177,7 +177,7 @@ class World():
                 break
         return V, policy
     
-    def epsilon_greedy_q_learning(self, alpha=0.5, epsilon=0.5, gamma=0.98, episodes=500):
+    def epsilon_greedy_q_learning(self, alpha=0.5, epsilon=0.5, gamma=0.98, episodes=10000):
         Q = {
             (i, j): {action: 0.0 for action in ['^', 'v', '<', '>']}
             for i in range(self.rows) for j in range(self.cols)
