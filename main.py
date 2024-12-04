@@ -250,7 +250,7 @@ def main():
         
     for run in range(5):
         print(f"Run {run + 1}:")
-        Q, policy, expected_value = world.epsilon_greedy_q_learning(alpha=0.5, epsilon=0.5, gamma=0.98, episodes=500)
+        Q, policy, expected_value = world.epsilon_greedy_q_learning(alpha=0.5, epsilon=0.5, gamma=0.98, episodes=15000)
 
         print("Value Grid:")
         values = np.zeros((7, 6))
