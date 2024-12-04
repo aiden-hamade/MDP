@@ -1,5 +1,5 @@
 import numpy as np
-import json
+from copy import deepcopy
 import random
 
 class World():
@@ -65,10 +65,10 @@ class World():
                     rewards[i][j] = -100000
                 elif cell == 'W':
                     rewards[i][j] = -100000
-                elif cell == 'B':
-                    rewards[i][j] = -1
-                elif cell in {'S', 'SB'}:
-                    rewards[i][j] = -1
+                #elif cell == 'B':
+                #    rewards[i][j] = -1
+                #elif cell in {'S', 'SB'}:
+                #    rewards[i][j] = -1
         return rewards
     
     def get_next_state(self, state, action):
@@ -94,28 +94,25 @@ class World():
                     actions = self.valid_moves(state)
                     action_values = []
                     for action in actions:
-                        value = 0
+                        expected_value = 0
                         # Intended move
                         next_state = self.get_next_state(state, action)
-                        value += 0.7 * (rewards[next_state] + gamma * V[next_state])
+                        expected_value += 0.7 * V[next_state]
                         # Reverse move
                         reverse_action = {'^': 'v', 'v': '^', '<': '>', '>': '<'}[action]
                         reverse_state = self.get_next_state(state, reverse_action)
-                        value += 0.15 * (rewards[reverse_state] + gamma * V[reverse_state])
+                        expected_value += 0.15 * V[reverse_state]
                         # Stall
-                        value += 0.15 * (rewards[state] + gamma * V[state])
-                        action_values.append(value)
-                    new_V[i, j] = max(action_values) if action_values else V[i, j]
+                        expected_value += 0.15 * V[state]
+                        action_values.append(expected_value)
+                    new_V[i, j] = max(action_values) * gamma + rewards[i][j]
                     self.policy[(i, j)] = actions[np.argmax(action_values)] if action_values else None
-            if np.max(np.abs(new_V - V)) < 1e-4:
-                break
+            #if np.max(np.abs(new_V - V)) < 1e-4:
+            #    break
             V = new_V
         return V
     
     def policy_evaluation(self, policy, gamma=0.95, time_horizon=50):
-        """
-        Evaluates a policy for a given time horizon.
-        """
         rewards = self.get_rewards()
         V = np.zeros((self.rows, self.cols))  # Initialize value function to zero
         for _ in range(time_horizon):  # Run for a fixed number of iterations
@@ -126,24 +123,21 @@ class World():
                     action = policy[state]
                     if action is None:
                         continue
-                    value = 0
+                    expected_value = 0
                     # Intended move
                     next_state = self.get_next_state(state, action)
-                    value += 0.7 * (rewards[next_state] + gamma * V[next_state])
+                    expected_value += 0.7 * V[next_state]
                     # Reverse move
                     reverse_action = {'^': 'v', 'v': '^', '<': '>', '>': '<'}[action]
                     reverse_state = self.get_next_state(state, reverse_action)
-                    value += 0.15 * (rewards[reverse_state] + gamma * V[reverse_state])
+                    expected_value += 0.15 * V[reverse_state]
                     # Stall
-                    value += 0.15 * (rewards[state] + gamma * V[state])
-                    new_V[i, j] = value
+                    expected_value += 0.15 * V[state]
+                    new_V[i, j] = expected_value * gamma + rewards[i, j]
             V = new_V
         return V
 
     def policy_iteration(self, gamma=0.95, time_horizon=50):
-        """
-        Runs Policy Iteration with a fixed time horizon for evaluation.
-        """
         rewards = self.get_rewards()
         policy = {state: np.random.choice(self.valid_moves(state)) if self.valid_moves(state) else None
                   for state in [(i, j) for i in range(self.rows) for j in range(self.cols)]}
@@ -151,7 +145,7 @@ class World():
             # Policy Evaluation
             V = self.policy_evaluation(policy, gamma, time_horizon)
             # Policy Improvement
-            policy_stable = True
+            policy_optimal = True
             for i in range(self.rows):
                 for j in range(self.cols):
                     state = (i, j)
@@ -160,30 +154,30 @@ class World():
                         continue
                     action_values = []
                     for action in actions:
-                        value = 0
+                        expected_value = 0
                         # Intended move
                         next_state = self.get_next_state(state, action)
-                        value += 0.7 * (rewards[next_state] + gamma * V[next_state])
+                        expected_value += 0.7 *  V[next_state]
                         # Reverse move
                         reverse_action = {'^': 'v', 'v': '^', '<': '>', '>': '<'}[action]
                         reverse_state = self.get_next_state(state, reverse_action)
-                        value += 0.15 * (rewards[reverse_state] + gamma * V[reverse_state])
+                        expected_value += 0.15 * V[reverse_state]
                         # Stall
-                        value += 0.15 * (rewards[state] + gamma * V[state])
-                        action_values.append(value)
+                        expected_value += 0.15 * V[state]
+                        action_values.append(expected_value)
                     best_action = actions[np.argmax(action_values)]
-                    if best_action != policy[state]:
-                        policy_stable = False
-                    policy[state] = best_action
-            if policy_stable:
+                    new_policy = deepcopy(policy)
+                    new_policy[state] = best_action
+                    new_V = self.policy_evaluation(new_policy, gamma, time_horizon)
+                    if new_V[state] > V[state]:
+                        policy[state] = best_action
+                        policy_optimal = False
+                        V = new_V
+            if policy_optimal:
                 break
         return V, policy
     
     def epsilon_greedy_q_learning(self, alpha=0.5, epsilon=0.5, gamma=0.98, episodes=500):
-        """
-        Runs epsilon-greedy Q-learning on the Wumpus World.
-        """
-        # Initialize Q-table
         Q = {
             (i, j): {action: 0.0 for action in ['^', 'v', '<', '>']}
             for i in range(self.rows) for j in range(self.cols)
