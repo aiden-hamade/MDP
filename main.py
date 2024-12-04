@@ -43,32 +43,19 @@ class World():
         if y < self.cols - 1:
             moves.append('>')  # Right
         
-        #if y == 0:
-        #    moves.remove('down')
-        #if x == 5:
-        #    moves.remove('right')
-        #if x == 0:
-        #    moves.remove('left')
-        #if y == 6:
-        #    moves.remove('up')
-        
         return moves
     
     def get_rewards(self):
-        rewards = np.full((self.rows, self.cols), -0.1)  # Default small penalty
+        rewards = np.full((self.rows, self.cols), -1)  # Default small penalty
         for i in range(self.rows):
             for j in range(self.cols):
                 cell = self.map[i][j]
                 if cell == 'G':
-                    rewards[i][j] = 1000
+                    rewards[i][j] = 10000
                 elif cell == 'P':
                     rewards[i][j] = -100000
                 elif cell == 'W':
                     rewards[i][j] = -100000
-                #elif cell == 'B':
-                #    rewards[i][j] = -1
-                #elif cell in {'S', 'SB'}:
-                #    rewards[i][j] = -1
         return rewards
     
     def get_next_state(self, state, action):
@@ -107,8 +94,6 @@ class World():
                         action_values.append(expected_value)
                     new_V[i, j] = max(action_values) * gamma + rewards[i][j]
                     self.policy[(i, j)] = actions[np.argmax(action_values)] if action_values else None
-            #if np.max(np.abs(new_V - V)) < 1e-4:
-            #    break
             V = new_V
         return V
     
@@ -187,7 +172,7 @@ class World():
         rewards = self.get_rewards()
 
         # List to collect cumulative rewards for each run
-        cumulative_rewards = []
+        #cumulative_rewards = []
 
         # Run the episodes
         for episode in range(episodes):
@@ -201,12 +186,7 @@ class World():
                     action = random.choice(list(Q[state].keys()))  # Explore
                 else:
                     action = max(Q[state], key=Q[state].get)  # Exploit
-                
-                # Determine next state and reward
-                next_state = self.get_next_state(state, action)
-                reward = rewards[next_state]
-                episode_reward += reward
-
+                    
                 # Determine actual action outcome based on transition probabilities
                 prob = random.random()
                 if prob < 0.15:  # Reverse
@@ -216,11 +196,15 @@ class World():
                     next_state = self.get_next_state(state, reverse_action)
                 elif prob < 0.30:  # Stall
                     next_state = state
+                else:
+                    next_state = self.get_next_state(state, action)
+                    
+                #episode_reward = rewards[next_state]
                 
                 # Update Q-value
                 best_next_q = max(Q[next_state].values()) if Q[next_state] else 0
                 Q[state][action] = Q[state][action] + alpha * (
-                    reward + gamma * best_next_q - Q[state][action]
+                    rewards[next_state] + gamma * best_next_q - Q[state][action]
                 )
                 
                 # Transition to the next state
@@ -231,7 +215,7 @@ class World():
                     break
             
             # Store cumulative reward for the episode
-            cumulative_rewards.append(episode_reward)
+            #cumulative_rewards.append(episode_reward)
         
         # Derive the policy from the Q-table
         policy = {
@@ -239,22 +223,26 @@ class World():
             for state in Q
         }
         
-        return Q, policy, cumulative_rewards
+        expected_values = {
+            state: max(Q[state].values()) if Q[state] else 0
+            for state in Q
+        }
+        
+        return Q, policy, expected_values
      
 
 def main():
+    
     world = World()
     V = world.value_iteration(gamma=0.95, time_horizon=50)
     print(V)
-    #with open('test.json', 'w') as file:
-        #json.dump(world.policy, file)
     for i in range(world.rows):
         print(' '.join(world.policy[(i, j)] or '.' for j in range(world.cols)))
         
         
         
     print("\npolicy iteration\n")
-    value, policy = world.policy_iteration(gamma=0.95, time_horizon=50)
+    value, policy = world.policy_iteration(gamma=0.95, time_horizon=100)
     print(value)
         
     for i in range(world.rows):
@@ -263,19 +251,24 @@ def main():
     results = []
     for run in range(5):
         print(f"Run {run + 1}:")
-        Q, policy, rewards = world.epsilon_greedy_q_learning(alpha=0.5, epsilon=0.5, gamma=0.98, episodes=500)
+        Q, policy, expected_value = world.epsilon_greedy_q_learning(alpha=0.5, epsilon=0.5, gamma=0.98, episodes=500)
 
         # Collect results
         results.append({
             'Q': Q,
             'policy': policy,
-            'rewards': rewards
+            'value': expected_value
         })
 
         # Output cumulative rewards and policy for the run
-        print("Cumulative Rewards:")
-        print(rewards[-10:])  # Last 10 rewards as a sample
-
+        print("Value Grid:")
+        #print(expected_value)
+        values = np.zeros((7, 6))
+        for (i, j), value in expected_value.items():
+            values[i, j] = value
+        for row in values:
+            print(" ".join(f"{value:.2f}" for value in row))
+        
         print("\nPolicy Grid:")
         for i in range(world.rows):
             print(' '.join(policy[(i, j)] if policy[(i, j)] else '.' for j in range(world.cols)))
